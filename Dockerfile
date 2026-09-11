@@ -1,6 +1,6 @@
 FROM rust:alpine AS build
 
-RUN apk add --no-cache build-base musl-dev pkgconf openssl-dev
+RUN apk add --no-cache build-base musl-dev pkgconf openssl-dev openssl-libs-static
 WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
@@ -15,12 +15,9 @@ RUN mkdir -p /app/workflow-data && chown -R 10001:10001 /app/workflow-data
 USER 10001:10001
 
 FROM runtime-base AS api
-COPY --from=build /src/target/release/drission-workflow-api /usr/local/bin/workflow-api
-COPY --from=build /src/target/release/drission-workflow-runner /usr/local/bin/workflow-runner
+COPY --from=build /src/target/release/drission-workflow-api /usr/local/bin/drission-workflow-api
+COPY --from=build /src/target/release/drission-workflow-runner /usr/local/bin/drission-workflow-runner
 EXPOSE 8787
-ENTRYPOINT ["/usr/local/bin/workflow-api"]
-CMD ["--listen", "0.0.0.0:8787", "--database", "/app/workflow-data/workflows.db", "--artifacts", "/app/workflow-data/artifacts", "--runner", "/usr/local/bin/workflow-runner"]
+ENTRYPOINT ["/usr/local/bin/drission-workflow-api"]
+CMD ["--listen", "0.0.0.0:8787", "--database", "/app/workflow-data/workflows.db", "--artifacts", "/app/workflow-data/artifacts", "--runner", "/usr/local/bin/drission-workflow-runner"]
 
-FROM runtime-base AS runner
-COPY --from=build /src/target/release/drission-workflow-runner /usr/local/bin/workflow-runner
-ENTRYPOINT ["/usr/local/bin/workflow-runner"]

@@ -31,10 +31,3 @@ jobs:
           target: api
           push: true
           tags: ${{ env.IMAGE_PREFIX }}/workflow-api:${{ env.IMAGE_TAG }}
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile
-          target: runner
-          push: true
-          tags: ${{ env.IMAGE_PREFIX }}/workflow-runner:${{ env.IMAGE_TAG }}
