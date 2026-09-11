@@ -1,0 +1,16 @@
+[package]
+name = "driver-drission"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+rust_drission.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+base64 = "0.22"
+regex.workspace = true
+ureq = "2.10"
+url = { workspace = true }
+workflow-schema = { path = "../workflow-schema" }

@@ -1,0 +1,15 @@
+[package]
+name = "workflow-definition"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+thiserror.workspace = true
+workflow-actions = { path = "../workflow-actions" }
+workflow-core = { path = "../workflow-core" }
+workflow-schema = { path = "../workflow-schema" }

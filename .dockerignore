@@ -1,0 +1,10 @@
+.git
+.github
+target
+temp
+logs
+credentials
+runtime
+outputs
+*.db
+*.sqlite*

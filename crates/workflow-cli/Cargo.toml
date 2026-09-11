@@ -1,0 +1,23 @@
+[package]
+name = "workflow-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "drission-workflow"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+driver-drission = { path = "../driver-drission" }
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+workflow-actions = { path = "../workflow-actions" }
+workflow-artifacts = { path = "../workflow-artifacts" }
+workflow-core = { path = "../workflow-core" }
+workflow-engine = { path = "../workflow-engine" }
+workflow-schema = { path = "../workflow-schema" }
+workflow-store = { path = "../workflow-store" }

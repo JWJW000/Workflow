@@ -1,0 +1,20 @@
+[package]
+name = "workflow-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+driver-drission = { path = "../driver-drission" }
+regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+url.workspace = true
+workflow-actions = { path = "../workflow-actions" }
+workflow-artifacts = { path = "../workflow-artifacts" }
+workflow-core = { path = "../workflow-core" }
+workflow-schema = { path = "../workflow-schema" }
+
+[dev-dependencies]

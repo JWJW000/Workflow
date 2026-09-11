@@ -1,0 +1,10 @@
+[package]
+name = "workflow-actions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde_json.workspace = true
+workflow-core = { path = "../workflow-core" }

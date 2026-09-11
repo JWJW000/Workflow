@@ -1,0 +1,15 @@
+[package]
+name = "workflow-runner"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "drission-workflow-runner"
+path = "src/main.rs"
+
+[dependencies]
+serde_json.workspace = true
+workflow-core = { path = "../workflow-core" }
+workflow-engine = { path = "../workflow-engine" }
