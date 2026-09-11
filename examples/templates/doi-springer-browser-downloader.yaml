@@ -1,0 +1,99 @@
+apiVersion: drission.workflow/v1
+kind: Workflow
+
+metadata:
+  name: doi-springer-browser-downloader
+  title: SpringerLink DOI 北航 WebVPN 真实浏览器下载
+  description: 使用独立 Springer 校园网 Chrome Profile，经北航 WebVPN 下载 OA 和订阅 PDF。
+  tags: [academic, doi, springer, campus-vpn, webvpn, real-browser, pdf-downloader]
+
+inputs:
+  articles:
+    type: array
+    required: true
+
+browser:
+  mode: launch
+  headless: false
+  profile: persistent:.drission-workflow/profiles/doi-springer-campus
+  downloadDir: downloads
+  noImages: false
+
+defaults:
+  timeout: 120s
+  retry:
+    maxAttempts: 1
+
+steps:
+  - id: launch_browser
+    name: 启动 Springer 北航 WebVPN 专用 Chrome
+    action: browser.launch
+    with:
+      headless: false
+      profile: persistent:.drission-workflow/profiles/doi-springer-campus
+      noImages: false
+
+  - id: inject_initial_stealth
+    name: 初始化浏览器反检测环境
+    action: browser.injectStealth
+    onError: continue
+
+  - id: authenticate_buaa
+    name: 建立北航 WebVPN Springer 会话（首次运行请在窗口中手动登录）
+    action: page.goto
+    timeout: 310s
+    with:
+      url: "https://d.buaa.edu.cn/https/77726476706e69737468656265737421fcfe4f976923784277068ea98a1b203a54/"
+
+  - id: download_articles
+    name: 串行下载 SpringerLink PDF
+    foreach:
+      items: "${inputs.articles}"
+      itemName: article
+      maxItems: 500
+      concurrency: 1
+      steps:
+        - id: inject_page_stealth
+          name: 下载前刷新反检测环境
+          action: browser.injectStealth
+          onError: continue
+
+        - id: open_article
+          name: 打开 Springer 文章页（避免直接 PDF 重定向压垮渲染器）
+          action: page.goto
+          timeout: 60s
+          onError: continue
+          with:
+            url: "${article.landingUrl}"
+
+        - id: warmup_wait
+          name: 短暂等待文章页呈现 PDF 入口
+          action: data.randomWait
+          onError: continue
+          with:
+            minDuration: 300ms
+            maxDuration: 800ms
+
+        - id: download_pdf
+          name: SpringerLink PDF 下载
+          action: download.click
+          timeout: 60s
+          onError: continue
+          with:
+            locator:
+              anyOf:
+                - "css:a[data-track-action='download pdf']"
+                - "css:a[href*='/content/pdf/']"
+                - "css:a[href*='.pdf']"
+                - "css:a[title*='PDF']"
+                - "text:Download PDF"
+                - "text:PDF"
+            filename: "${article.filename}"
+
+  - id: close_browser
+    name: 批次完成后关闭 Springer 浏览器，释放渲染进程
+    action: browser.close
+    onError: continue
+
+outputs:
+  requested: "${inputs.articles}"

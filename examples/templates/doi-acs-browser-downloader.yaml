@@ -1,0 +1,66 @@
+apiVersion: drission.workflow/v1
+kind: Workflow
+metadata:
+  name: doi-acs-browser-downloader
+  title: ACS DOI 北航 WebVPN 真实浏览器下载
+  tags: [academic, doi, acs, webvpn, real-browser]
+inputs:
+  articles: {type: array, required: true}
+browser:
+  mode: launch
+  headless: false
+  profile: persistent:.drission-workflow/profiles/doi-acs-buaa-campus
+  downloadDir: downloads
+  noImages: false
+defaults:
+  timeout: 120s
+  retry: {maxAttempts: 1}
+steps:
+  - id: launch_browser
+    action: browser.launch
+    with:
+      headless: false
+      profile: persistent:.drission-workflow/profiles/doi-acs-buaa-campus
+      noImages: false
+  - id: stealth
+    action: browser.injectStealth
+    onError: continue
+  - id: authenticate_buaa
+    action: page.goto
+    timeout: 310s
+    with:
+      url: "https://d.buaa.edu.cn/https/77726476706e69737468656265737421e0e2438f69316b4330079bab/"
+  - id: download_articles
+    foreach:
+      items: "${inputs.articles}"
+      itemName: article
+      maxItems: 500
+      concurrency: 1
+      steps:
+        - id: open_article
+          action: page.goto
+          timeout: 120s
+          with: {url: "${article.url}"}
+        - id: wait
+          action: data.randomWait
+          onError: continue
+          with: {minDuration: 300ms, maxDuration: 800ms}
+        - id: download_pdf
+          action: download.click
+          timeout: 120s
+          with:
+            locator:
+              anyOf:
+                - "css:a[href*='/article-pdf/']"
+                - "css:a[href*='/doi/pdf/']"
+                - "css:a[href*='/doi/epdf/']"
+                - "css:a[title*='PDF']"
+                - "text:PDF"
+            filename: "${article.filename}"
+
+  - id: close_browser
+    name: 批次完成后关闭 ACS 浏览器，避免孤儿进程累积
+    action: browser.close
+    onError: continue
+
+outputs: {requested: "${inputs.articles}"}

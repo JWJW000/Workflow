@@ -1,0 +1,70 @@
+apiVersion: drission.workflow/v1
+kind: Workflow
+metadata:
+  name: doi-tju-platform-audit
+  title: 天津大学资源访问二平台能力审计
+  description: 针对高优先级 15 个平台抽样审计访问与全文权限
+  tags: [academic, doi, campus-vpn, tju, real-browser, audit]
+inputs:
+  articles: {type: array, required: true}
+browser:
+  mode: launch
+  headless: false
+  profile: persistent:.drission-workflow/profiles/doi-tju-audit
+  downloadDir: downloads
+  noImages: false
+defaults:
+  timeout: 60s
+  retry: {maxAttempts: 1}
+steps:
+  - id: launch_browser
+    action: browser.launch
+    with:
+      headless: false
+      profile: persistent:.drission-workflow/profiles/doi-tju-audit
+      noImages: false
+  - id: stealth
+    action: browser.injectStealth
+    onError: continue
+  - id: check_session
+    name: 确认天津大学资源访问二登录会话
+    action: page.goto
+    timeout: 300s
+    with:
+      url: "https://p.lib.tju.edu.cn/"
+  - id: audit_platforms
+    foreach:
+      items: "${inputs.articles}"
+      itemName: article
+      maxItems: 50
+      concurrency: 1
+      steps:
+        - id: open_article
+          action: page.goto
+          timeout: 60s
+          onError: continue
+          with: {url: "${article.url}"}
+        - id: wait_render
+          action: data.randomWait
+          onError: continue
+          with: {minDuration: 1500ms, maxDuration: 3000ms}
+        - id: screenshot
+          action: page.screenshot
+          onError: continue
+          with: {path: "screenshots/tju_${article.platform}_${article.doi_stem}.png"}
+        - id: download_pdf
+          action: download.click
+          timeout: 60s
+          onError: continue
+          with:
+            locator:
+              anyOf:
+                - "css:a[href*='/doi/pdf/']"
+                - "css:a[href*='articlepdf']"
+                - "css:a[href*='/pdf/']"
+                - "css:a[aria-label*='PDF']"
+                - "css:a[title*='PDF']"
+                - "text:PDF"
+            filename: "${article.filename}"
+
+outputs: {requested: "${inputs.articles}"}

@@ -1,0 +1,80 @@
+apiVersion: drission.workflow/v1
+kind: Workflow
+
+metadata:
+  name: doi-campus-browser-downloader
+  title: DOI 校园网机构权限真实浏览器下载
+  description: 复用独立校园网 Chrome Profile；按站点预热后下载 DOI 对应 PDF。
+  tags: [academic, doi, campus-vpn, real-browser, pdf-downloader]
+
+inputs:
+  articles:
+    type: array
+    required: true
+
+browser:
+  mode: launch
+  headless: false
+  profile: persistent:.drission-workflow/profiles/doi-campus
+  downloadDir: downloads
+  noImages: false
+
+defaults:
+  timeout: 240s
+  retry:
+    maxAttempts: 1
+
+steps:
+  - id: launch_browser
+    name: 启动校园网专用 Chrome
+    action: browser.launch
+    with:
+      headless: false
+      profile: persistent:.drission-workflow/profiles/doi-campus
+      noImages: false
+
+  - id: inject_initial_stealth
+    name: 初始化浏览器反检测环境
+    action: browser.injectStealth
+    onError: continue
+
+  - id: download_articles
+    name: 按域名串行下载 DOI 论文
+    foreach:
+      items: "${inputs.articles}"
+      itemName: article
+      maxItems: 500
+      concurrency: 1
+      steps:
+        - id: warm_article_page
+          name: 打开文章页建立机构访问会话
+          action: page.goto
+          timeout: 90s
+          onError: continue
+          with:
+            url: "${article.landingUrl}"
+
+        - id: inject_page_stealth
+          name: 导航后刷新反检测环境
+          action: browser.injectStealth
+          onError: continue
+
+        - id: warmup_wait
+          name: 等待机构权限与安全验证稳定
+          action: data.randomWait
+          onError: continue
+          with:
+            minDuration: 200ms
+            maxDuration: 600ms
+
+        - id: download_pdf
+          name: 机构权限 PDF 下载
+          action: download.click
+          timeout: 240s
+          onError: continue
+          with:
+            url: "${article.url}"
+            filename: "${article.filename}"
+
+outputs:
+  requested: "${inputs.articles}"

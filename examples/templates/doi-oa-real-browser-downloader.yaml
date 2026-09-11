@@ -1,0 +1,80 @@
+apiVersion: drission.workflow/v1
+kind: Workflow
+
+metadata:
+  name: doi-oa-real-browser-downloader
+  title: DOI 开放论文真实浏览器批量下载
+  description: 复用持久 Chrome；优先 OA 直链，失败后用真实浏览器打开 DOI。人机验证时等待人工完成。
+  tags: [academic, doi, open-access, real-browser, pdf-downloader]
+
+inputs:
+  articles:
+    type: array
+    required: true
+
+browser:
+  mode: launch
+  headless: false
+  profile: persistent:.drission-workflow/profiles/doi-oa
+  downloadDir: downloads
+  noImages: false
+
+defaults:
+  timeout: 240s
+  retry:
+    maxAttempts: 1
+
+steps:
+  - id: launch_browser
+    name: 启动并复用真实 Chrome
+    action: browser.launch
+    with:
+      headless: false
+      profile: persistent:.drission-workflow/profiles/doi-oa
+      noImages: false
+
+  - id: inject_initial_stealth
+    name: 初始化浏览器反检测环境
+    action: browser.injectStealth
+    onError: continue
+
+  - id: download_articles
+    name: 串行下载 DOI 论文
+    foreach:
+      items: "${inputs.articles}"
+      itemName: article
+      maxItems: 500
+      concurrency: 1
+      steps:
+        - id: warm_article_page
+          name: 先打开文章页建立站点会话
+          action: page.goto
+          timeout: 90s
+          onError: continue
+          with:
+            url: "${article.landingUrl}"
+
+        - id: inject_page_stealth
+          name: 导航后刷新反检测环境
+          action: browser.injectStealth
+          onError: continue
+
+        - id: warmup_wait
+          name: 等待 Cookie 与安全验证稳定
+          action: data.randomWait
+          onError: continue
+          with:
+            minDuration: 1200ms
+            maxDuration: 2800ms
+
+        - id: download_pdf
+          name: OA 直链优先，真实浏览器兜底
+          action: download.click
+          timeout: 240s
+          onError: continue
+          with:
+            url: "${article.url}"
+            filename: "${article.filename}"
+
+outputs:
+  requested: "${inputs.articles}"

@@ -1,0 +1,73 @@
+apiVersion: drission.workflow/v1
+kind: Workflow
+metadata:
+  name: doi-rsc-browser-downloader
+  title: Royal Society of Chemistry (RSC) DOI 北航 WebVPN 下载
+  tags: [academic, doi, rsc, webvpn, real-browser]
+inputs:
+  articles: {type: array, required: true}
+browser:
+  mode: launch
+  headless: false
+  profile: persistent:.drission-workflow/profiles/doi-rsc-buaa-campus
+  downloadDir: downloads
+  noImages: false
+defaults:
+  timeout: 180s
+  retry: {maxAttempts: 1}
+steps:
+  - id: launch_browser
+    action: browser.launch
+    with:
+      headless: false
+      profile: persistent:.drission-workflow/profiles/doi-rsc-buaa-campus
+      noImages: false
+  - id: authenticate_buaa
+    action: page.goto
+    timeout: 1210s
+    with:
+      url: "https://d.buaa.edu.cn/https/77726476706e69737468656265737421e0e2438f69227b5330079bab/"
+  - id: download_articles
+    foreach:
+      items: "${inputs.articles}"
+      itemName: article
+      maxItems: 50
+      concurrency: 1
+      steps:
+        - id: open_article
+          action: page.goto
+          timeout: 120s
+          onError: continue
+          with: {url: "${article.url}"}
+        - id: wait
+          action: data.randomWait
+          onError: continue
+          with: {minDuration: 8000ms, maxDuration: 15000ms}
+        - id: wait_pdf
+          action: page.wait
+          timeout: 60s
+          onError: continue
+          with:
+            locator:
+              anyOf:
+                - "css:a[href*='articlepdf']"
+                - "css:a[href*='pdf']"
+                - "css:a.btn--download"
+                - "text:PDF"
+        - id: download_pdf
+          action: download.click
+          timeout: 180s
+          onError: continue
+          with:
+            locator:
+              anyOf:
+                - "css:a.btn--download[href*='articlepdf']"
+                - "css:a[href*='articlepdf']"
+                - "css:a[href*='/en/content/articlepdf/']"
+                - "css:a[href*='pdf']"
+                - "css:a.btn--download"
+                - "css:a[aria-label*='PDF']"
+                - "text:PDF"
+            filename: "${article.filename}"
+
+outputs: {requested: "${inputs.articles}"}

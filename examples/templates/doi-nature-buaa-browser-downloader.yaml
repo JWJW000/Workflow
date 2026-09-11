@@ -1,0 +1,79 @@
+apiVersion: drission.workflow/v1
+kind: Workflow
+
+metadata:
+  name: doi-nature-buaa-browser-downloader
+  title: Nature DOI 北航 WebVPN 真实浏览器下载
+  description: 使用独立 Nature Chrome Profile，经已连接的北航 WebVPN 下载 OA 和订阅 PDF。
+  tags: [academic, doi, nature, buaa, campus-vpn, webvpn, real-browser, pdf-downloader]
+
+inputs:
+  articles:
+    type: array
+    required: true
+
+browser:
+  mode: launch
+  headless: false
+  profile: persistent:.drission-workflow/profiles/doi-nature-buaa-campus
+  downloadDir: downloads
+  noImages: false
+
+defaults:
+  timeout: 360s
+  retry:
+    maxAttempts: 1
+
+steps:
+  - id: launch_browser
+    name: 启动 Nature 北航 WebVPN 专用 Chrome
+    action: browser.launch
+    with:
+      headless: false
+      profile: persistent:.drission-workflow/profiles/doi-nature-buaa-campus
+      noImages: false
+
+  - id: inject_initial_stealth
+    name: 初始化浏览器反检测环境
+    action: browser.injectStealth
+    onError: continue
+
+  - id: verify_buaa_vpn
+    name: 使用北航 WebVPN 打开 Nature
+    action: page.goto
+    timeout: 360s
+    with:
+      url: "https://d.buaa.edu.cn/https/77726476706e69737468656265737421e7e056d229317c456c0dc7af9758/"
+
+  - id: download_articles
+    name: 串行下载 Nature PDF
+    foreach:
+      items: "${inputs.articles}"
+      itemName: article
+      maxItems: 500
+      concurrency: 1
+      steps:
+        - id: inject_page_stealth
+          name: 下载前刷新反检测环境
+          action: browser.injectStealth
+          onError: continue
+
+        - id: warmup_wait
+          name: 短暂下载间隔
+          action: data.randomWait
+          onError: continue
+          with:
+            minDuration: 500ms
+            maxDuration: 1200ms
+
+        - id: download_pdf
+          name: Nature PDF 下载
+          action: download.click
+          timeout: 360s
+          onError: continue
+          with:
+            url: "${article.url}"
+            filename: "${article.filename}"
+
+outputs:
+  requested: "${inputs.articles}"

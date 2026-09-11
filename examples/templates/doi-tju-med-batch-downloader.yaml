@@ -1,0 +1,93 @@
+apiVersion: drission.workflow/v1
+kind: Workflow
+metadata:
+  name: doi-tju-med-batch-downloader
+  title: 天津大学资源访问二高价值医学期刊批量下载（自动登录后代理中转版）
+  description: Python 前置程序已完成资源二自动登录及会话检查，本工作流直接复用同一个共享浏览器下载。
+inputs:
+  articles:
+    type: array
+    required: true
+
+browser:
+  mode: launch
+  headless: false
+  profile: persistent:.drission-workflow/profiles/doi-tju-audit
+  downloadDir: downloads
+  noImages: false
+
+defaults:
+  timeout: 75s
+  retry:
+    maxAttempts: 1
+
+steps:
+  - id: launch_browser
+    name: 启动天大资源二专属Chrome
+    action: browser.launch
+    with:
+      headless: false
+      profile: persistent:.drission-workflow/profiles/doi-tju-audit
+      noImages: false
+
+  - id: inject_stealth
+    name: 初始化反检测环境
+    action: browser.injectStealth
+    onError: continue
+
+  - id: download_articles
+    name: 连续下载医学文献（通过天大远程代理流访问）
+    foreach:
+      items: "${inputs.articles}"
+      itemName: article
+      maxItems: 50
+      concurrency: 1
+      steps:
+        - id: proxy_navigate
+          name: 通过天大远程访问系统打开文献
+          action: page.goto
+          timeout: 60s
+          with:
+            url: "${article.url}"
+
+        - id: wait_render
+          name: 拟人停留（3~5秒，等待机构授权条加载）
+          action: data.randomWait
+          onError: continue
+          with:
+            minDuration: 3000ms
+            maxDuration: 5000ms
+
+        - id: download_pdf
+          name: 识别全文授权并下载PDF
+          action: download.click
+          timeout: 60s
+          onError: continue
+          with:
+            locator:
+              anyOf:
+                - "css:a[href*='/doi/pdf/']"
+                - "css:a[href*='/doi/pdfdirect/']"
+                - "css:a[href*='articlepdf']"
+                - "css:a[href*='/pdf/']"
+                - "css:a[aria-label*='PDF']"
+                - "css:a[title*='PDF']"
+                - "text:PDF"
+                - "text:Download PDF"
+            filename: "${article.filename}"
+
+        - id: inter_article_cooldown
+          name: 拟人阅读间隔（5~10秒）
+          action: data.randomWait
+          onError: continue
+          with:
+            minDuration: 5000ms
+            maxDuration: 10000ms
+
+  - id: close_browser
+    name: 批次完成后关闭天大医学专用Chrome
+    action: browser.close
+    onError: continue
+
+outputs:
+  requested: "${inputs.articles}"

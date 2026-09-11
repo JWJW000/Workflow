@@ -1,0 +1,57 @@
+apiVersion: drission.workflow/v1
+kind: Workflow
+metadata:
+  name: doi-aps-browser-downloader
+  title: APS DOI 北航 WebVPN 真实浏览器下载
+  tags: [academic, doi, aps, webvpn, real-browser]
+inputs:
+  articles: {type: array, required: true}
+browser:
+  mode: launch
+  headless: false
+  profile: persistent:.drission-workflow/profiles/doi-aps-buaa-campus
+  downloadDir: downloads
+  noImages: false
+defaults:
+  timeout: 120s
+  retry: {maxAttempts: 1}
+steps:
+  - id: launch_browser
+    action: browser.launch
+    with:
+      headless: false
+      profile: persistent:.drission-workflow/profiles/doi-aps-buaa-campus
+      noImages: false
+  - id: stealth
+    action: browser.injectStealth
+    onError: continue
+  - id: authenticate_buaa
+    action: page.goto
+    timeout: 310s
+    with:
+      url: "https://d.buaa.edu.cn/https/77726476706e69737468656265737421fcfe4f976931784330079bab/"
+  - id: download_articles
+    foreach:
+      items: "${inputs.articles}"
+      itemName: article
+      maxItems: 500
+      concurrency: 1
+      steps:
+        - id: open_article
+          action: page.goto
+          timeout: 120s
+          onError: continue
+          with: {url: "${article.landingUrl}"}
+        - id: wait
+          action: data.randomWait
+          onError: continue
+          with: {minDuration: 300ms, maxDuration: 800ms}
+        - id: download_pdf
+          action: download.click
+          timeout: 120s
+          onError: continue
+          with:
+            url: "${article.url}"
+            filename: "${article.filename}"
+
+outputs: {requested: "${inputs.articles}"}

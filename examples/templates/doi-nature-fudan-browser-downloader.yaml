@@ -1,0 +1,79 @@
+apiVersion: drission.workflow/v1
+kind: Workflow
+
+metadata:
+  name: doi-nature-fudan-browser-downloader
+  title: Nature DOI 复旦 EasyConnect 真实浏览器下载
+  description: 使用独立 Nature Chrome Profile，经已连接的复旦 EasyConnect 下载 OA 和订阅 PDF。
+  tags: [academic, doi, nature, fudan, campus-vpn, easyconnect, real-browser, pdf-downloader]
+
+inputs:
+  articles:
+    type: array
+    required: true
+
+browser:
+  mode: launch
+  headless: false
+  profile: persistent:.drission-workflow/profiles/doi-nature-fudan-campus
+  downloadDir: downloads
+  noImages: false
+
+defaults:
+  timeout: 120s
+  retry:
+    maxAttempts: 1
+
+steps:
+  - id: launch_browser
+    name: 启动 Nature 复旦 VPN 专用 Chrome
+    action: browser.launch
+    with:
+      headless: false
+      profile: persistent:.drission-workflow/profiles/doi-nature-fudan-campus
+      noImages: false
+
+  - id: inject_initial_stealth
+    name: 初始化浏览器反检测环境
+    action: browser.injectStealth
+    onError: continue
+
+  - id: verify_fudan_vpn
+    name: 使用复旦 EasyConnect 打开 Nature
+    action: page.goto
+    timeout: 120s
+    with:
+      url: "https://www.nature.com/"
+
+  - id: download_articles
+    name: 串行下载 Nature PDF
+    foreach:
+      items: "${inputs.articles}"
+      itemName: article
+      maxItems: 500
+      concurrency: 1
+      steps:
+        - id: inject_page_stealth
+          name: 下载前刷新反检测环境
+          action: browser.injectStealth
+          onError: continue
+
+        - id: warmup_wait
+          name: 短暂下载间隔
+          action: data.randomWait
+          onError: continue
+          with:
+            minDuration: 500ms
+            maxDuration: 1200ms
+
+        - id: download_pdf
+          name: Nature PDF 下载
+          action: download.click
+          timeout: 120s
+          onError: continue
+          with:
+            url: "${article.url}"
+            filename: "${article.filename}"
+
+outputs:
+  requested: "${inputs.articles}"

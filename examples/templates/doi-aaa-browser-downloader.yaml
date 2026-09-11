@@ -1,0 +1,61 @@
+apiVersion: drission.workflow/v1
+kind: Workflow
+metadata:
+  name: doi-aaa-browser-downloader
+  title: American Accounting Association DOI 北航 WebVPN 下载
+  tags: [academic, doi, accounting, webvpn, real-browser]
+inputs:
+  articles: {type: array, required: true}
+browser:
+  mode: launch
+  headless: false
+  profile: persistent:.drission-workflow/profiles/doi-aaa-buaa-campus
+  downloadDir: downloads
+  noImages: false
+defaults:
+  timeout: 120s
+  retry: {maxAttempts: 1}
+steps:
+  - id: launch_browser
+    action: browser.launch
+    with:
+      headless: false
+      profile: persistent:.drission-workflow/profiles/doi-aaa-buaa-campus
+      noImages: false
+  - id: stealth
+    action: browser.injectStealth
+    onError: continue
+  - id: authenticate_buaa
+    action: page.goto
+    timeout: 310s
+    with:
+      url: "https://d.buaa.edu.cn/https/77726476706e69737468656265737421e0e243902e336944770787bfd6542234e0fc78bd2c7e/"
+  - id: download_articles
+    foreach:
+      items: "${inputs.articles}"
+      itemName: article
+      maxItems: 500
+      concurrency: 1
+      steps:
+        - id: open_article
+          action: page.goto
+          timeout: 120s
+          onError: continue
+          with: {url: "${article.url}"}
+        - id: wait
+          action: data.randomWait
+          onError: continue
+          with: {minDuration: 1500ms, maxDuration: 3000ms}
+        - id: download_pdf
+          action: download.click
+          timeout: 120s
+          onError: continue
+          with:
+            locator:
+              anyOf:
+                - "css:a[href*='/article-pdf/10.2308/']"
+                - "css:.article-tools a[href*='/article-pdf/']"
+                - "css:a[href*='/article-pdf/']"
+            filename: "${article.filename}"
+
+outputs: {requested: "${inputs.articles}"}

@@ -1,0 +1,84 @@
+apiVersion: drission.workflow/v1
+kind: Workflow
+metadata:
+  name: doi-elsevier-tju-eds-batch-downloader
+  title: 天津大学EDS接入Elsevier多篇批量下载（学者正常阅读流仿真版）
+  description: 完整还原学者查阅论文行为：进入文章详情页、上报正常前端打点、拟人浏览、点击下载按钮，避免WAF端点风控。
+inputs:
+  articles:
+    type: array
+    required: true
+
+browser:
+  mode: launch
+  headless: false
+  profile: persistent:.drission-workflow/profiles/doi-tju-eds
+  downloadDir: downloads
+  noImages: false
+
+defaults:
+  timeout: 90s
+  retry:
+    maxAttempts: 1
+
+steps:
+  - id: launch_browser
+    name: 启动天大EDS专用Chrome（单实例常驻）
+    action: browser.launch
+    with:
+      headless: false
+      profile: persistent:.drission-workflow/profiles/doi-tju-eds
+      noImages: false
+
+  - id: inject_initial_stealth
+    name: 初始化反检测环境
+    action: browser.injectStealth
+    onError: continue
+
+  - id: authenticate_eds
+    name: 激活天大EDS会话
+    action: page.goto
+    timeout: 45s
+    with:
+      url: "https://cfbfh253cb3a601b84ef2sbwnowbbpncov6xw6fgac.eds.tju.edu.cn/"
+
+  - id: download_articles
+    name: 仿真学者阅读流批量下载
+    foreach:
+      items: "${inputs.articles}"
+      itemName: article
+      maxItems: 50
+      concurrency: 1
+      steps:
+        - id: navigate_article_page
+          name: 打开论文完整主页
+          action: page.goto
+          timeout: 60s
+          with:
+            url: "${article.url}"
+
+        - id: simulate_reading
+          name: 拟人浏览停留（5~8秒，让前端分析JS完整执行并打点）
+          action: data.randomWait
+          with:
+            minDuration: 5000ms
+            maxDuration: 8000ms
+
+        - id: click_download_button
+          name: 使用同一真实浏览器会话打开页面提供的PDF地址
+          action: download.click
+          timeout: 60s
+          with:
+            url: "${article.pdf_url}"
+            filename: "${article.filename}"
+
+        - id: reading_cooldown
+          name: 拟人阅读下一篇前的思考间隔（8~15秒）
+          action: data.randomWait
+          onError: continue
+          with:
+            minDuration: 8000ms
+            maxDuration: 15000ms
+
+outputs:
+  requested: "${inputs.articles}"
