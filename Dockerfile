@@ -29,7 +29,7 @@ COPY --from=build /src/target/release/drission-workflow /usr/local/bin/drission-
 COPY examples/academic /app/examples/academic
 COPY examples/templates /app/examples/templates
 RUN mkdir -p /app/academic-data /app/.drission-workflow && chown -R 10001:10001 /app/academic-data /app/.drission-workflow
-ENV DRISSION_ROOT=/app DRISSION_CHROME_BIN=/usr/bin/chromium DRISSION_CHROME_HEADLESS=1 PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+ENV XDG_CONFIG_HOME=/app/.drission-workflow/config XDG_CACHE_HOME=/app/.drission-workflow/cache DRISSION_ROOT=/app DRISSION_CHROME_BIN=/usr/bin/chromium DRISSION_CHROME_HEADLESS=1 PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 USER 10001:10001
 EXPOSE 8899
 ENTRYPOINT ["python3", "/app/examples/academic/status_server.py"]
